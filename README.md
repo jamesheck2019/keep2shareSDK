@@ -4,6 +4,7 @@
 
 `Download:`
 [https://github.com/jamesheck2019/keep2shareSDK/releases](https://github.com/jamesheck2019/keep2shareSDK/releases)<br>
+[![NuGet version (BlackBeltCoder.Silk)](https://img.shields.io/nuget/v/DeQmaTech.keep2shareSDK.svg?style=plastic)](https://www.nuget.org/packages/DeQmaTech.keep2shareSDK/)
 `Help:`
 [https://github.com/jamesheck2019/keep2shareSDK/wiki](https://github.com/jamesheck2019/keep2shareSDK/wiki)<br>
 
