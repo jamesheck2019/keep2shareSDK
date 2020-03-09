@@ -8,7 +8,7 @@
 [https://github.com/jamesheck2019/keep2shareSDK/wiki](https://github.com/jamesheck2019/keep2shareSDK/wiki)<br>
 
 # Features
-* Assemblies for .NET 4.5.2
+* Assemblies for .NET 4.5.2 and .NET Standard 2.0 and .NET Core 2.1
 * Just one external reference (Newtonsoft.Json)
 * Easy installation using NuGet
 * Upload/Download tracking support
