@@ -1,0 +1,33 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>keep2shareSDK is a .Net library for k2s.cc / keep2share.cc video hosting service.</Description>
+    <Copyright>Copyright © 2019 DeQmaTech LLC.</Copyright>
+    <AssemblyTitle>keep2shareSDK</AssemblyTitle>
+    <NeutralLanguage>en-US</NeutralLanguage>
+    <VersionPrefix>1.1.0</VersionPrefix>
+    <Title>keep2shareSDK</Title>
+    <Authors>DeQmaTech</Authors>
+    <AssemblyName>keep2shareSDK</AssemblyName>
+    <PackageProjectUrl>https://github.com/jamesheck2019/keep2shareSDK</PackageProjectUrl>
+    <PackageLicenseUrl>https://github.com/jamesheck2019/keep2shareSDK/LICENSE</PackageLicenseUrl>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+    <PackageTags>keep2share;netstandard;cloud-storage</PackageTags>
+    <RepositoryUrl>https://github.com/jamesheck2019/keep2shareSDK</RepositoryUrl>
+  </PropertyGroup>
+  
+  <PropertyGroup>
+    <RootNamespace>keep2shareSDK</RootNamespace>
+    <TargetFrameworks>netstandard2.0;netcoreapp2.1;net461</TargetFrameworks>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <PackageId>DeQmaTech.keep2shareSDK</PackageId>
+  </PropertyGroup>
+
+<ItemGroup>
+  <PackageReference Include="Newtonsoft.Json" Version="11.0.2" />
+  <PackageReference Include="Microsoft.AspNet.WebApi.Client" Version="5.2.3" />
+  <PackageReference Include="System.Net.Http" Version="4.3.3" />
+  <PackageReference Include="System.Drawing.Common" Version="4.7.0" />
+</ItemGroup>
+
+</Project>
