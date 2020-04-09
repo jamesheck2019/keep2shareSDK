@@ -10,7 +10,7 @@ namespace keep2shareSDK
 {
   public   interface IClient
     {
-
+        string RootID { get; set; }
         Task<JSON_FileMetadata> FileMetadata(string DestinationFileID);
         Task<int> DeleteMultiple(List<string> DestinationFileFolderIDs);
         Task<bool> Delete(string DestinationFileFolderID);

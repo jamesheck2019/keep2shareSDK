@@ -1,8 +1,11 @@
 ﻿using keep2shareSDK.JSON;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
+using System.Net.Http;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace keep2shareSDK
 {
@@ -64,18 +67,31 @@ namespace keep2shareSDK
             public pUri(string ApiAction) : base(APIbase + ApiAction) { }
         }
 
-        public static void ShowError(string result)
+        public static keep2shareException ShowError(string result)
         {
             JSON_Error errorInfo = JsonConvert.DeserializeObject<JSON_Error>(result, JSONhandler);
             throw new keep2shareException(errorInfo.ErrorMessage, 1002);
         }
 
-        public static System.Net.Http.HttpContent JsonContent(this object JsonCls)
+        public static HttpContent JsonContent(this object JsonCls)
         {
-            return new System.Net.Http.StringContent(JsonConvert.SerializeObject(JsonCls, Formatting.None, new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore }), System.Text.Encoding.UTF8, "application/json");
+            return new StringContent(JsonConvert.SerializeObject(JsonCls, Formatting.None, new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore }), Encoding.UTF8, "application/json");
         }
 
+        public static async Task<HttpResponseMessage> RequestAsync(HttpMethod method, string url, HttpContent content)
+        {
+            using (HtpClient localHtpClient = new HtpClient(new HCHandler()))
+            {
+                HttpRequestMessage requ = new HttpRequestMessage(method, new Uri(APIbase + url)) { Content = content };
+                HttpResponseMessage response = await localHtpClient.SendAsync(requ, HttpCompletionOption.ResponseContentRead).ConfigureAwait(false);
+                return response;
+            }
+        }
 
+        public static bool Success(this HttpResponseMessage Response)
+        {
+            return Response.StatusCode== System.Net.HttpStatusCode.OK && JObject.Parse(Response.Content.ReadAsStringAsync().Result).SelectToken("status").ToString() == "success" ? true: false ;
+        }
 
 
     }

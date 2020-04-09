@@ -4,6 +4,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Net;
 using System.Net.Http;
 using System.Threading;
@@ -31,6 +32,8 @@ public class KClient : IClient
         }
     }
 
+
+    public string RootID { get; set; } = "/";
 
     #region useUnsafeHeaderParsing
     // ' solving exception message: "The server committed a protocol violation. Section=ResponseHeader Detail=CR must be followed by LF"
@@ -62,27 +65,18 @@ public class KClient : IClient
     #region RequestCaptcha
     public async Task<JSON_RequestCaptcha> RequestCaptcha()
     {
-        using (HtpClient localHttpClient = new HtpClient(new HCHandler()))
-        {
-            var HtpReqMessage = new HttpRequestMessage(HttpMethod.Post, new pUri("RequestCaptcha"));
-            using (HttpResponseMessage response = await localHttpClient.SendAsync(HtpReqMessage, HttpCompletionOption.ResponseContentRead).ConfigureAwait(false))
-            {
-                string result = await response.Content.ReadAsStringAsync();
 
-                var userInfo = JsonConvert.DeserializeObject<JSON_RequestCaptcha>(result, JSONhandler);
-                if (response.StatusCode == HttpStatusCode.OK)
-                {
-                    var img = await CaptchaImage(userInfo.captcha_url);
-                    userInfo.captcha_image = img;
-                    return userInfo;
-                }
-                else
-                {
-                    ShowError(result);
-                    return null;
-                }
-            }
+        HttpResponseMessage response = await RequestAsync(HttpMethod.Post, "RequestCaptcha", null);
+        string result = await response.Content.ReadAsStringAsync();
+
+        var userInfo = JsonConvert.DeserializeObject<JSON_RequestCaptcha>(result, JSONhandler);
+        if (response.StatusCode == HttpStatusCode.OK)
+        {
+            userInfo.captcha_image = await CaptchaImage(userInfo.captcha_url);
+            return userInfo;
         }
+        else
+        { throw ShowError(result); }
     }
     #endregion
 
@@ -105,51 +99,22 @@ public class KClient : IClient
     #region TestAccessToken
     public async Task<JSON_TestAccessToken> TestAccessToken()
     {
-        using (HtpClient localHttpClient = new HtpClient(new HCHandler()))
-        {
-            var HtpReqMessage = new HttpRequestMessage(HttpMethod.Post, new pUri("test"));
-            HtpReqMessage.Content = new StringContent(JsonConvert.SerializeObject(new { auth_token = authToken }), System.Text.Encoding.UTF8, "application/json");
+        var EncodedObj = new { auth_token = authToken };
 
-            using (HttpResponseMessage response = await localHttpClient.SendAsync(HtpReqMessage, HttpCompletionOption.ResponseContentRead).ConfigureAwait(false))
-            {
-                string result = await response.Content.ReadAsStringAsync();
-
-                if (JObject.Parse(result).SelectToken("status").ToString() == "success")
-                {
-                    return JsonConvert.DeserializeObject<JSON_TestAccessToken>(result, JSONhandler);
-                }
-                else
-                {
-                    ShowError(result);
-                    return null;
-                }
-            }
-        }
+        HttpResponseMessage response = await RequestAsync(HttpMethod.Post, "test", EncodedObj.JsonContent());
+        string result = await response.Content.ReadAsStringAsync();
+        return response.Success() ? JsonConvert.DeserializeObject<JSON_TestAccessToken>(result, JSONhandler) : throw ShowError(result);
     }
     #endregion
 
     #region AccountInfo
     public async Task<JSON_AccountInfo> AccountInfo()
     {
-        using (HtpClient localHttpClient = new HtpClient(new HCHandler()))
-        {
-            var HtpReqMessage = new HttpRequestMessage(HttpMethod.Post, new pUri("AccountInfo"));
-            HtpReqMessage.Content = (new { auth_token = authToken }).JsonContent();
-            using (HttpResponseMessage response = await localHttpClient.SendAsync(HtpReqMessage, HttpCompletionOption.ResponseContentRead).ConfigureAwait(false))
-            {
-                string result = await response.Content.ReadAsStringAsync();
+        var EncodedObj = new { auth_token = authToken };
 
-                if (JObject.Parse(result).SelectToken("status").ToString() == "success")
-                {
-                    return JsonConvert.DeserializeObject<JSON_AccountInfo>(result, JSONhandler);
-                }
-                else
-                {
-                    ShowError(result);
-                    return null;
-                }
-            }
-        }
+        HttpResponseMessage response = await RequestAsync(HttpMethod.Post, "AccountInfo", EncodedObj.JsonContent());
+        string result = await response.Content.ReadAsStringAsync();
+        return response.Success() ? JsonConvert.DeserializeObject<JSON_AccountInfo>(result, JSONhandler) : throw ShowError(result);
     }
     #endregion
 
@@ -177,181 +142,77 @@ public class KClient : IClient
     }
     public async Task<JSON_FilesList> RootList(LocationType FileorFolder, int Limit, int OffSet, RootListOptions.SortOptions SortBy, bool PublicFilesFoldersOnly = false, bool DetailedJson = false)
     {
-        using (HtpClient localHttpClient = new HtpClient(new HCHandler()))
-        {
-            var HtpReqMessage = new HttpRequestMessage(HttpMethod.Post, new pUri("GetFilesList"));
-            var JSONobj = new RootListOptions() { auth_token = authToken, parent = "/", limit = Limit, offset = OffSet, sort = SortBy, type = FileorFolder, only_available = PublicFilesFoldersOnly, extended_info = DetailedJson };
-            HtpReqMessage.Content = JSONobj.JsonContent();
-            using (HttpResponseMessage response = await localHttpClient.SendAsync(HtpReqMessage, HttpCompletionOption.ResponseContentRead).ConfigureAwait(false))
-            {
-                string result = await response.Content.ReadAsStringAsync();
+        var EncodedObj = new RootListOptions() { auth_token = authToken, parent = "/", limit = Limit, offset = OffSet, sort = SortBy, type = FileorFolder, only_available = PublicFilesFoldersOnly, extended_info = DetailedJson };
 
-                if (JObject.Parse(result).SelectToken("status").ToString() == "success")
-                {
-                    return JsonConvert.DeserializeObject<JSON_FilesList>(result, JSONhandler);
-                }
-                else
-                {
-                    ShowError(result);
-                    return null;
-                }
-            }
-        }
+        HttpResponseMessage response = await RequestAsync(HttpMethod.Post, "GetFilesList", EncodedObj.JsonContent());
+        string result = await response.Content.ReadAsStringAsync();
+        return response.Success() ? JsonConvert.DeserializeObject<JSON_FilesList>(result, JSONhandler) : throw ShowError(result);
     }
     #endregion
 
     #region ListFiles
     public async Task<JSON_FilesList> ListFiles(string DestinationFolderID, LocationType FileorFolder, int Limit, int OffSet, RootListOptions.SortOptions SortBy = null, bool DetailedJson = false)
     {
-        using (HtpClient localHttpClient = new HtpClient(new HCHandler()))
-        {
-            HttpRequestMessage HtpReqMessage = new HttpRequestMessage(HttpMethod.Post, new pUri("GetFilesList"));
-            var JSONobj = new RootListOptions() { auth_token = authToken, parent = DestinationFolderID, limit = Limit, offset = OffSet, sort = SortBy, type = FileorFolder, only_available = false, extended_info = DetailedJson };
-            HtpReqMessage.Content = JSONobj.JsonContent();
-            using (HttpResponseMessage response = await localHttpClient.SendAsync(HtpReqMessage, HttpCompletionOption.ResponseContentRead).ConfigureAwait(false))
-            {
-                string result = await response.Content.ReadAsStringAsync();
+        var EncodedObj = new RootListOptions() { auth_token = authToken, parent = DestinationFolderID, limit = Limit, offset = OffSet, sort = SortBy, type = FileorFolder, only_available = false, extended_info = DetailedJson };
 
-                if (JObject.Parse(result).SelectToken("status").ToString() == "success")
-                {
-                    return JsonConvert.DeserializeObject<JSON_FilesList>(result, JSONhandler);
-                }
-                else
-                {
-                    ShowError(result);
-                    return null;
-                }
-            }
-        }
+        HttpResponseMessage response = await RequestAsync(HttpMethod.Post, "GetFilesList", EncodedObj.JsonContent());
+        string result = await response.Content.ReadAsStringAsync();
+        return response.Success() ? JsonConvert.DeserializeObject<JSON_FilesList>(result, JSONhandler) : throw ShowError(result);
     }
     #endregion
 
     #region ListFolders
     public async Task<JSON_ListFolders> ListFolders()
     {
-        using (HtpClient localHttpClient = new HtpClient(new HCHandler()))
-        {
-            HttpRequestMessage HtpReqMessage = new HttpRequestMessage(HttpMethod.Post, new pUri("GetFoldersList"));
-            HtpReqMessage.Content = (new { auth_token = authToken }).JsonContent();
-            using (HttpResponseMessage response = await localHttpClient.SendAsync(HtpReqMessage, HttpCompletionOption.ResponseContentRead).ConfigureAwait(false))
-            {
-                string result = await response.Content.ReadAsStringAsync();
+        var EncodedObj = new { auth_token = authToken };
 
-                if (JObject.Parse(result).SelectToken("status").ToString() == "success")
-                {
-                    return JsonConvert.DeserializeObject<JSON_ListFolders>(result, JSONhandler);
-                }
-                else
-                {
-                    ShowError(result);
-                    return null;
-                }
-            }
-        }
+        HttpResponseMessage response = await RequestAsync(HttpMethod.Post, "GetFoldersList", EncodedObj.JsonContent());
+        string result = await response.Content.ReadAsStringAsync();
+        return response.Success() ? JsonConvert.DeserializeObject<JSON_ListFolders>(result, JSONhandler) : throw ShowError(result);
     }
     #endregion
 
     #region CreateNewFolder
     public async Task<JSON_CreateNewFolder> CreateNewFolder(string DestinationFolderID, string FolderName, bool SetPublic)
     {
-        using (HtpClient localHttpClient = new HtpClient(new HCHandler()))
-        {
-            HttpRequestMessage HtpReqMessage = new HttpRequestMessage(HttpMethod.Post, new pUri("CreateFolder"));
-            var JSONobj = new { auth_token = authToken, parent = DestinationFolderID, name = FolderName, is_public = SetPublic, access = SetAccess.@public.ToString() };
-            HtpReqMessage.Content = JSONobj.JsonContent();
-            using (HttpResponseMessage response = await localHttpClient.SendAsync(HtpReqMessage, HttpCompletionOption.ResponseContentRead).ConfigureAwait(false))
-            {
-                string result = await response.Content.ReadAsStringAsync();
+        var EncodedObj = new { auth_token = authToken, parent = DestinationFolderID, name = FolderName, is_public = SetPublic, access = SetAccess.@public.ToString() };
 
-                if (JObject.Parse(result).SelectToken("status").ToString() == "success")
-                {
-                    return JsonConvert.DeserializeObject<JSON_CreateNewFolder>(result, JSONhandler);
-                }
-                else
-                {
-                    ShowError(result);
-                    return null;
-                }
-            }
-        }
+        HttpResponseMessage response = await RequestAsync(HttpMethod.Post, "CreateFolder", EncodedObj.JsonContent());
+        string result = await response.Content.ReadAsStringAsync();
+        return response.Success() ? JsonConvert.DeserializeObject<JSON_CreateNewFolder>(result, JSONhandler) : throw ShowError(result);
     }
     #endregion
 
     #region RenameFileFolder
     public async Task<bool> Rename(string DestinationFileFolderID, string NewName)
     {
-        using (HtpClient localHttpClient = new HtpClient(new HCHandler()))
-        {
-            HttpRequestMessage HtpReqMessage = new HttpRequestMessage(HttpMethod.Post, new pUri("UpdateFile"));
-            var JSONobj = new { auth_token = authToken, id = DestinationFileFolderID, new_name = NewName };
-            HtpReqMessage.Content = JSONobj.JsonContent();
-            using (HttpResponseMessage response = await localHttpClient.SendAsync(HtpReqMessage, HttpCompletionOption.ResponseContentRead).ConfigureAwait(false))
-            {
-                string result = await response.Content.ReadAsStringAsync();
+        var EncodedObj = new { auth_token = authToken, id = DestinationFileFolderID, new_name = NewName };
 
-                if (JObject.Parse(result).SelectToken("status").ToString() == "success")
-                {
-                    return true;
-                }
-                else
-                {
-                    ShowError(result);
-                    return false;
-                }
-            }
-        }
+        HttpResponseMessage response = await RequestAsync(HttpMethod.Post, "UpdateFile", EncodedObj.JsonContent());
+        string result = await response.Content.ReadAsStringAsync();
+        return response.Success() ? true : throw ShowError(result);
     }
     #endregion
 
     #region Move
     public async Task<bool> Move(string SourceFileFolderID, string DestinationFolderID)
     {
-        using (HtpClient localHttpClient = new HtpClient(new HCHandler()))
-        {
-            var HtpReqMessage = new HttpRequestMessage(HttpMethod.Post, new pUri("UpdateFile"));
-            var JSONobj = new { auth_token = authToken, id = SourceFileFolderID, new_parent = DestinationFolderID };
-            HtpReqMessage.Content = JSONobj.JsonContent();
-            using (HttpResponseMessage response = await localHttpClient.SendAsync(HtpReqMessage, HttpCompletionOption.ResponseContentRead).ConfigureAwait(false))
-            {
-                string result = await response.Content.ReadAsStringAsync();
+        var EncodedObj = new { auth_token = authToken, id = SourceFileFolderID, new_parent = DestinationFolderID };
 
-                if (JObject.Parse(result).SelectToken("status").ToString() == "success")
-                {
-                    return true;
-                }
-                else
-                {
-                    ShowError(result);
-                    return false;
-                }
-            }
-        }
+        HttpResponseMessage response = await RequestAsync(HttpMethod.Post, "UpdateFile", EncodedObj.JsonContent());
+        string result = await response.Content.ReadAsStringAsync();
+        return response.Success() ? true : throw ShowError(result);
     }
     #endregion
 
     #region MoveAndRename
     public async Task<bool> MoveAndRename(string SourceFileFolderID, string DestinationFolderID, string RenameTo)
     {
-        using (HtpClient localHttpClient = new HtpClient(new HCHandler()))
-        {
-            HttpRequestMessage HtpReqMessage = new HttpRequestMessage(HttpMethod.Post, new pUri("UpdateFile"));
-            var JSONobj = new { auth_token = authToken, id = SourceFileFolderID, new_parent = DestinationFolderID, new_name = RenameTo };
-            HtpReqMessage.Content = JSONobj.JsonContent();
-            using (HttpResponseMessage response = await localHttpClient.SendAsync(HtpReqMessage, HttpCompletionOption.ResponseContentRead).ConfigureAwait(false))
-            {
-                string result = await response.Content.ReadAsStringAsync();
+        var EncodedObj = new { auth_token = authToken, id = SourceFileFolderID, new_parent = DestinationFolderID, new_name = RenameTo };
 
-                if (JObject.Parse(result).SelectToken("status").ToString() == "success")
-                {
-                    return true;
-                }
-                else
-                {
-                    ShowError(result);
-                    return false;
-                }
-            }
-        }
+        HttpResponseMessage response = await RequestAsync(HttpMethod.Post, "UpdateFile", EncodedObj.JsonContent());
+        string result = await response.Content.ReadAsStringAsync();
+        return response.Success() ? true : throw ShowError(result);
     }
     #endregion
 
@@ -364,102 +225,44 @@ public class KClient : IClient
     }
     public async Task<bool> ChangePrivacy(string DestinationFileFolderID, SetAccess Access)
     {
-        using (HtpClient localHttpClient = new HtpClient(new HCHandler()))
-        {
-            HttpRequestMessage HtpReqMessage = new HttpRequestMessage(HttpMethod.Post, new pUri("UpdateFile"));
-            var JSONobj = new ChangeFileFolderAccessOptions() { auth_token = authToken, id = DestinationFileFolderID, new_access = Access.ToString() };
-            HtpReqMessage.Content = JSONobj.JsonContent();
-            using (HttpResponseMessage response = await localHttpClient.SendAsync(HtpReqMessage, HttpCompletionOption.ResponseContentRead).ConfigureAwait(false))
-            {
-                string result = await response.Content.ReadAsStringAsync();
+        var EncodedObj = new ChangeFileFolderAccessOptions() { auth_token = authToken, id = DestinationFileFolderID, new_access = Access.ToString() };
 
-                if (JObject.Parse(result).SelectToken("status").ToString() == "success")
-                {
-                    return true;
-                }
-                else
-                {
-                    ShowError(result);
-                    return false;
-                }
-            }
-        }
+        HttpResponseMessage response = await RequestAsync(HttpMethod.Post, "UpdateFile", EncodedObj.JsonContent());
+        string result = await response.Content.ReadAsStringAsync();
+        return response.Success() ? true : throw ShowError(result);
     }
     #endregion
 
     #region RemoteUpload
     public async Task<JSON_RemoteUpload> RemoteUpload(List<string> Links)
     {
-        using (HtpClient localHttpClient = new HtpClient(new HCHandler()))
-        {
-            var HtpReqMessage = new HttpRequestMessage(HttpMethod.Post, new pUri("RemoteUploadAdd"));
-            HtpReqMessage.Content = (new { auth_token = authToken, urls = Links }).JsonContent();
-            using (HttpResponseMessage response = await localHttpClient.SendAsync(HtpReqMessage, HttpCompletionOption.ResponseContentRead).ConfigureAwait(false))
-            {
-                string result = await response.Content.ReadAsStringAsync();
+        var EncodedObj = new { auth_token = authToken, urls = Links };
 
-                if (JObject.Parse(result).SelectToken("status").ToString() == "success")
-                {
-                    return JsonConvert.DeserializeObject<JSON_RemoteUpload>(result, JSONhandler);
-                }
-                else
-                {
-                    ShowError(result);
-                    return null;
-                }
-            }
-        }
+        HttpResponseMessage response = await RequestAsync(HttpMethod.Post, "RemoteUploadAdd", EncodedObj.JsonContent());
+        string result = await response.Content.ReadAsStringAsync();
+        return response.Success() ? JsonConvert.DeserializeObject<JSON_RemoteUpload>(result, JSONhandler) : throw ShowError(result);
     }
     #endregion
 
     #region RemoteUploadStatus
     public async Task<JSON_RemoteUploadStatus> RemoteUploadStatus(List<string> JobIDs)
     {
-        using (HtpClient localHttpClient = new HtpClient(new HCHandler()))
-        {
-            HttpRequestMessage HtpReqMessage = new HttpRequestMessage(HttpMethod.Post, new pUri("RemoteUploadStatus"));
-            HtpReqMessage.Content = (new { auth_token = authToken, ids = JobIDs }).JsonContent();
-            using (HttpResponseMessage response = await localHttpClient.SendAsync(HtpReqMessage, HttpCompletionOption.ResponseContentRead).ConfigureAwait(false))
-            {
-                string result = await response.Content.ReadAsStringAsync();
+        var EncodedObj = new { auth_token = authToken, ids = JobIDs };
 
-                if (JObject.Parse(result).SelectToken("status").ToString() == "success")
-                {
-                    return JsonConvert.DeserializeObject<JSON_RemoteUploadStatus>(result, JSONhandler);
-                }
-                else
-                {
-                    ShowError(result);
-                    return null;
-                }
-            }
-        }
+        HttpResponseMessage response = await RequestAsync(HttpMethod.Post, "RemoteUploadStatus", EncodedObj.JsonContent());
+        string result = await response.Content.ReadAsStringAsync();
+        return response.Success() ? JsonConvert.DeserializeObject<JSON_RemoteUploadStatus>(result, JSONhandler) : throw ShowError(result);
     }
     #endregion
 
     #region Upload
     private async Task<JSON_GetUploadUrl> GetUploadUrl(string DestinationFolderID)
     {
-        using (HtpClient localHttpClient = new HtpClient(new HCHandler()))
-        {
-            HttpRequestMessage HtpReqMessage = new HttpRequestMessage(HttpMethod.Post, new pUri("GetUploadFormData"));
-            var JSONobj = new { auth_token = authToken, parent_id = DestinationFolderID, preferred_node = string.Empty };
-            HtpReqMessage.Content = JSONobj.JsonContent();
-            using (HttpResponseMessage response = await localHttpClient.SendAsync(HtpReqMessage, HttpCompletionOption.ResponseContentRead).ConfigureAwait(false))
-            {
-                string result = await response.Content.ReadAsStringAsync();
+        var EncodedObj = new { auth_token = authToken, parent_id = DestinationFolderID, preferred_node = string.Empty };
 
-                if (JObject.Parse(result).SelectToken("status").ToString() == "success")
-                {
-                    return JsonConvert.DeserializeObject<JSON_GetUploadUrl>(result, JSONhandler);
-                }
-                else
-                {
-                    ShowError(result);
-                    return null;
-                }
-            }
-        }
+        HttpResponseMessage response = await RequestAsync(HttpMethod.Post, "GetUploadFormData", EncodedObj.JsonContent());
+        string result = await response.Content.ReadAsStringAsync();
+        return response.Success() ? JsonConvert.DeserializeObject<JSON_GetUploadUrl>(result, JSONhandler) : throw ShowError(result);
     }
 
     public async Task<JSON_Upload> Upload(object FileToUpload, UploadTypes UploadType, string DestinationFolderID, string FileName, IProgress<ReportStatus> ReportCls = null, CancellationToken token = default)
@@ -475,18 +278,18 @@ public class KClient : IClient
             HttpClient localHttpClient = new HtpClient(progressHandler);
             HttpRequestMessage HtpReqMessage = new HttpRequestMessage(HttpMethod.Post, new Uri(uploadUrl.form_action));
             MultipartFormDataContent MultipartsformData = new MultipartFormDataContent();
-            HttpContent streamContent=null;
+            HttpContent streamContent = null;
             switch (UploadType)
             {
-                case  UploadTypes.FilePath:
-                        streamContent = new StreamContent(new System.IO.FileStream(FileToUpload.ToString(), System.IO.FileMode.Open, System.IO.FileAccess.Read));
-                        break;
-                case  UploadTypes.Stream:
-                        streamContent = new StreamContent((System.IO.Stream)FileToUpload);
-                        break;
-                case  UploadTypes.BytesArry:
-                        streamContent = new StreamContent(new System.IO.MemoryStream((byte[])FileToUpload));
-                        break;
+                case UploadTypes.FilePath:
+                    streamContent = new StreamContent(new FileStream(FileToUpload.ToString(), FileMode.Open, FileAccess.Read));
+                    break;
+                case UploadTypes.Stream:
+                    streamContent = new StreamContent((Stream)FileToUpload);
+                    break;
+                case UploadTypes.BytesArry:
+                    streamContent = new StreamContent(new MemoryStream((byte[])FileToUpload));
+                    break;
             }
             streamContent.Headers.Clear();
             streamContent.Headers.ContentDisposition = new System.Net.Http.Headers.ContentDispositionHeaderValue("form-data") { Name = "file", FileName = FileName };
@@ -503,11 +306,11 @@ public class KClient : IClient
                 string result = await ResPonse.Content.ReadAsStringAsync();
 
                 token.ThrowIfCancellationRequested();
-                ResPonse.EnsureSuccessStatusCode();
-                var userInfo = JsonConvert.DeserializeObject<JSON_Upload>(result, JSONhandler);
+                ResPonse.EnsureSuccessStatusCode();               
                 if (JObject.Parse(result).SelectToken("status").ToString() == "success")
                 {
                     ReportCls.Report(new ReportStatus() { Finished = true, TextStatus = $"[{FileName}] Uploaded successfully" });
+                    var userInfo = JsonConvert.DeserializeObject<JSON_Upload>(result, JSONhandler);
                     return userInfo;
                 }
                 else
@@ -527,7 +330,7 @@ public class KClient : IClient
             }
             else
             {
-                throw new keep2shareException (ex.Message, 1001);
+                throw new keep2shareException(ex.Message, 1001);
             }
             return null;
         }
@@ -537,52 +340,22 @@ public class KClient : IClient
     #region FileMetadata
     public async Task<JSON_FileMetadata> FileMetadata(string DestinationFileID)
     {
-        using (HtpClient localHttpClient = new HtpClient(new HCHandler()))
-        {
-            HttpRequestMessage HtpReqMessage = new HttpRequestMessage(HttpMethod.Post, new pUri("GetFilesInfo"));
-            var JSONobj = new { auth_token = authToken, ids = new List<string>() { { DestinationFileID } }, extended_info = true };
-            HtpReqMessage.Content = JSONobj.JsonContent();
-            using (HttpResponseMessage response = await localHttpClient.SendAsync(HtpReqMessage, HttpCompletionOption.ResponseContentRead).ConfigureAwait(false))
-            {
-                string result = await response.Content.ReadAsStringAsync();
+            var EncodedObj = new { auth_token = authToken, ids = new List<string>() { { DestinationFileID } }, extended_info = true };
 
-                if (JObject.Parse(result).SelectToken("status").ToString() == "success")
-                {
-                    return JsonConvert.DeserializeObject<JSON_FilesList>(result, JSONhandler).FilesList[0];
-                }
-                else
-                {
-                    ShowError(result);
-                    return null;
-                }
-            }
-        }
+            HttpResponseMessage response = await RequestAsync(HttpMethod.Post, "GetFilesInfo", EncodedObj.JsonContent());
+            string result = await response.Content.ReadAsStringAsync();
+            return response.Success() ? JsonConvert.DeserializeObject<JSON_FilesList>(result, JSONhandler).FilesList[0] : throw ShowError(result);
     }
     #endregion
 
     #region DeleteMultiple
     public async Task<int> DeleteMultiple(List<string> DestinationFileFolderIDs)
     {
-        using (HtpClient localHttpClient = new HtpClient(new HCHandler()))
-        {
-            HttpRequestMessage HtpReqMessage = new HttpRequestMessage(HttpMethod.Post, new pUri("DeleteFiles"));
-            var JSONobj = new { auth_token = authToken, ids = DestinationFileFolderIDs };
-            HtpReqMessage.Content = JSONobj.JsonContent();
-            using (HttpResponseMessage response = await localHttpClient.SendAsync(HtpReqMessage, HttpCompletionOption.ResponseContentRead).ConfigureAwait(false))
-            {
-                string result = await response.Content.ReadAsStringAsync();
+        var EncodedObj = new { auth_token = authToken, ids = DestinationFileFolderIDs };
 
-                if (JObject.Parse(result).SelectToken("status").ToString() == "success")
-                {
-                    return Convert.ToInt32(JObject.Parse(result).SelectToken("deleted").ToString());
-                }
-                else
-                {
-                    ShowError(result);
-                    return 0;
-                }
-            }
-        }
+        HttpResponseMessage response = await RequestAsync(HttpMethod.Post, "DeleteFiles", EncodedObj.JsonContent());
+        string result = await response.Content.ReadAsStringAsync();
+        return response.Success() ? Convert.ToInt32(JObject.Parse(result).SelectToken("deleted").ToString()) : throw ShowError(result);
     }
     #endregion
 
